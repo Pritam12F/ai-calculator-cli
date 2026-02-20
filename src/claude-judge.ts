@@ -91,8 +91,5 @@ export async function judgeMe(messages: Messages) {
     model: "claude-opus-4-1-20250805",
   });
 
-  if (message.content[0]?.type === "text") {
-    console.log(message.content[0]?.text);
-  }
   return message.content[0]?.type === "text" ? message.content[0]?.text : "";
 }
