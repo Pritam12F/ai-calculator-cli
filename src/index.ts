@@ -1,0 +1,123 @@
+import { OpenAI } from "openai";
+import * as readline from "readline";
+import { stdin, stdout } from "process";
+import "dotenv/config";
+
+const client = new OpenAI();
+
+const SYSTEM_PROMPT = `You are an AI Assistant that takes in a math problem submitted by the user
+                       and solves it in steps. You don't just give out the final result directly,
+                       you first think about the problem and then proceed to solve it one math operation
+                       at a time, following the BODMAS rule. After no math operations are left you
+                       give out the final result to the user. You should never reply if the input doesn't
+                       include anything other than a mathematical expression.
+
+                       Strict Output JSON Format:
+
+                       { "step" : "START" | "THINK" | "END" | "NOTMATH", "content": string }
+
+                       Rules:
+
+                       1. Strictly follow the JSON Output Format.
+                       2. START step can only occur once.
+                       3. END step can only occur once.
+                       4. NOTMATH step is only used when the user asks something other than math.
+
+                       Example: The objects provided in the output section of these examples shows this JSON format is being returned one at a time,
+                       on each api call.
+                       
+                       1.
+                    
+                       INPUT: "What is the value of 5 * 2 - 10 / 2 + 1?"
+
+                       OUTPUT:
+                         
+                        { "step": "START", "content": "🧮 The user wants me to solve the equation 5 * 2 - 10 / 2 + 1 ..."}
+                        { "step": "THINK", "content": "🧠 Hmmm, we should first solve all the divisions and multiplications in the equation..." }
+                        { "step": "THINK", "content": "🧠 There is only 1 division and 1 multiplication operation in this equation, solving them simplifies the equation to 10 - 5 + 1" }
+                        { "step": "THINK", "content": "🧠 Next we should solve for the addition operators" }
+                        { "step": "THINK", "content": "🧠 There is only 1 addition operation in this equation, solving it simplifies the equation to 11 - 5" }
+                        { "step": "THINK", "content": "🧠 Next we should solve for the subtraction operators" }
+                        { "step": "THINK", "content": "🧠 There is only 1 subtraction operation in this equation, solving it simplifies the equation to 6" }
+                        { "step": "END", "content": "🤖 Done. The result of 5 * 2 - 10 / 2 + 1 is 6" }
+
+                        2.
+
+                        INPUT: "What is the value of a + b + c?"
+
+                        OUTPUT:
+
+                        { "step": "START", "content": "🧮 The user wants to what's the value of a + b + c" }
+                        { "step": "THINK", "content": "🧠 This looks like an invalid math expression, terminating chain-of-thought" }
+                        { "step": "END", "content": "🤖 Invalid math expression provided by the user." }
+
+                        3.
+
+                        INPUT: "Hey how are you?"
+
+                        OUTPUT:
+
+                        { "step": "NOTMATH", "content": "I am here to help if you need help with some math!" }
+                       `;
+
+let query = "";
+
+async function main() {
+  const messages: { role: "user" | "system" | "assistant"; content: string }[] =
+    [
+      {
+        role: "system",
+        content: SYSTEM_PROMPT,
+      },
+      {
+        role: "user",
+        content: query,
+      },
+    ];
+
+  while (true) {
+    const response = await client.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: messages,
+    });
+
+    messages.push({
+      role: "assistant",
+      content: response.choices[0]?.message.content!,
+    });
+
+    const parsedContent = JSON.parse(response.choices[0]?.message.content!);
+
+    if (parsedContent.step === "NOTMATH") {
+      console.log(parsedContent.content);
+      break;
+    } else if (parsedContent.step === "START") {
+      console.log(parsedContent.content);
+      continue;
+    } else if (parsedContent.step === "THINK") {
+      console.log(parsedContent.content);
+      continue;
+    } else if (parsedContent.step === "END") {
+      console.log(parsedContent.content);
+      break;
+    }
+  }
+}
+
+async function getUserInput() {
+  const rl = readline.createInterface({ input: stdin, output: stdout });
+
+  query = await new Promise((res, _) => {
+    rl.question(
+      "I am an AI calculator helping you simplify long mathemical expressions.\n What would you like me to solve?\n",
+      (answer) => {
+        res(answer);
+        rl.close();
+      },
+    );
+  });
+}
+
+getUserInput().then(async () => {
+  await main();
+});
